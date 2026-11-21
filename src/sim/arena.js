@@ -1,7 +1,12 @@
 import { Vector2 } from './vector.js';
 
-export const ARENA_WIDTH = 960;
-export const ARENA_HEIGHT = 640;
+export let ARENA_WIDTH = 960;
+export let ARENA_HEIGHT = 640;
+
+export function setArenaSize(width, height) {
+  ARENA_WIDTH = width;
+  ARENA_HEIGHT = height;
+}
 
 export function wrapPosition(pos) {
   let { x, y } = pos;
@@ -15,8 +20,8 @@ export function wrapPosition(pos) {
 export function findSafeSpawnPoint(world, safeRadius = 150) {
   for (let attempt = 0; attempt < 30; attempt++) {
     const candidate = new Vector2(
-      100 + Math.random() * (ARENA_WIDTH - 200),
-      100 + Math.random() * (ARENA_HEIGHT - 200)
+      100 + Math.random() * Math.max(120, ARENA_WIDTH - 200),
+      100 + Math.random() * Math.max(120, ARENA_HEIGHT - 200)
     );
 
     let safe = true;

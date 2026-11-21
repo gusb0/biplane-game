@@ -1,4 +1,4 @@
-export function createInput(canvas, { onFire, onToggleHoming } = {}) {
+export function createInput(canvas, { onFire, onToggleHoming, onOpenLobby } = {}) {
   const keys = new Set();
 
   const handleKeyDown = (event) => {
@@ -6,12 +6,15 @@ export function createInput(canvas, { onFire, onToggleHoming } = {}) {
 
     if (event.code === 'Space') {
       event.preventDefault();
-      // Викликаємо безпечно переданий колбек (з правильним this)
       if (onFire) onFire();
     }
 
     if (event.code === 'KeyH' && onToggleHoming) {
       onToggleHoming();
+    }
+
+    if (event.code === 'KeyL' && onOpenLobby) {
+      onOpenLobby();
     }
   };
 

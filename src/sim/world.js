@@ -1,4 +1,4 @@
-import { ARENA_WIDTH, ARENA_HEIGHT, findSafeSpawnPoint } from './arena.js';
+import { ARENA_WIDTH, ARENA_HEIGHT, setArenaSize, findSafeSpawnPoint } from './arena.js';
 import { Vector2 } from './vector.js';
 import { Ship } from './ship.js';
 import { Asteroid } from './asteroid.js';
@@ -13,11 +13,25 @@ function matchKinds(a, b, kind1, kind2) {
   return null;
 }
 
-export class World {
+export class World extends EventTarget {
   #entities = new Map();
   #pendingRemoval = new Set();
 
-  constructor() {
+  constructor({ arenaConfig = {}, playerName = 'Pilot' } = {}) {
+    super();
+    this.arenaConfig = {
+      name: arenaConfig.name || 'Standard Airspace',
+      width: arenaConfig.width || 960,
+      height: arenaConfig.height || 640,
+      asteroidCount: arenaConfig.asteroidCount || 6,
+      homingEvery: arenaConfig.homingEvery || 3,
+      bgColor: arenaConfig.bgColor || '#0f172a',
+      gridColor: arenaConfig.gridColor || 'rgba(148, 163, 184, 0.08)',
+    };
+    this.playerName = playerName;
+
+    setArenaSize(this.arenaConfig.width, this.arenaConfig.height);
+
     this.score = 0;
     this.respawnTimer = 0;
     this.pickupSpawnTimer = 4.0;
@@ -29,8 +43,8 @@ export class World {
     });
     this.spawn(this.ship);
 
-    for (let i = 0; i < 6; i++) {
-      this.spawnRandomAsteroid(i === 2); // один зі стартових — самонавідна homing-міна
+    for (let i = 0; i < this.arenaConfig.asteroidCount; i++) {
+      this.spawnRandomAsteroid(i === 2);
     }
   }
 
@@ -47,7 +61,6 @@ export class World {
     return entity;
   }
 
-  // Відкладене видалення: позначаємо мертвим і прибираємо в кінці кроку step()
   despawn(id) {
     const entity = this.#entities.get(id);
     if (!entity) return;
@@ -72,11 +85,36 @@ export class World {
     }
   }
 
+  addScore(delta, pos) {
+    this.score += delta;
+    this.dispatchEvent(
+      new CustomEvent('scoreChanged', {
+        detail: { score: this.score, delta, pos },
+      })
+    );
+  }
+
+  fireShipBullet() {
+    const bullet = this.ship.fire();
+    if (bullet) {
+      this.spawn(bullet);
+      this.dispatchEvent(
+        new CustomEvent('fired', {
+          detail: {
+            x: bullet.pos.x,
+            y: bullet.pos.y,
+            homing: Boolean(bullet.homing),
+          },
+        })
+      );
+    }
+    return bullet;
+  }
+
   spawnRandomAsteroid(forceHoming = false) {
     this.spawnCounter += 1;
-    const isHoming = forceHoming || this.spawnCounter % 3 === 0;
+    const isHoming = forceHoming || this.spawnCounter % this.arenaConfig.homingEvery === 0;
 
-    // Спавн біля країв арени, щоб не з'являтися прямо на гравці
     const edge = Math.floor(Math.random() * 4);
     let x = 0;
     let y = 0;
@@ -104,7 +142,7 @@ export class World {
       vx: vel.x,
       vy: vel.y,
       radius: isHoming ? 22 : 26,
-      hp: isHoming ? 50 : 50,
+      hp: 50,
       homing: isHoming
         ? createHomingComponent({
             targetKind: 'ship',
@@ -135,13 +173,18 @@ export class World {
   handleShipDeath() {
     if (!this.ship.alive) return;
     this.despawn(this.ship.id);
-    this.respawnTimer = 2.0; // респаун через 2 секунди за умовою лаби
+    this.respawnTimer = 2.0;
     this.spawn(
       new Explosion({
         x: this.ship.pos.x,
         y: this.ship.pos.y,
         count: 34,
         colors: ['#38bdf8', '#facc15', '#f97316', '#ef4444'],
+      })
+    );
+    this.dispatchEvent(
+      new CustomEvent('exploded', {
+        detail: { kind: 'ship', x: this.ship.pos.x, y: this.ship.pos.y },
       })
     );
   }
@@ -152,12 +195,17 @@ export class World {
     for (const [a, b] of pairs) {
       if (!a.alive || !b.alive) continue;
 
-      // 1. Куля + Астероїд
       const bulletAsteroid = matchKinds(a, b, 'bullet', 'asteroid');
       if (bulletAsteroid) {
         const [bullet, asteroid] = bulletAsteroid;
         this.despawn(bullet.id);
         asteroid.hp -= bullet.damage;
+
+        this.dispatchEvent(
+          new CustomEvent('hit', {
+            detail: { x: bullet.pos.x, y: bullet.pos.y, damage: bullet.damage },
+          })
+        );
 
         this.spawn(
           new Explosion({
@@ -170,7 +218,20 @@ export class World {
 
         if (asteroid.hp <= 0) {
           this.despawn(asteroid.id);
-          this.score += asteroid.isHoming ? 250 : 100;
+          const pts = asteroid.isHoming ? 250 : 100;
+          this.addScore(pts, asteroid.pos.clone());
+
+          this.dispatchEvent(
+            new CustomEvent('exploded', {
+              detail: {
+                kind: 'asteroid',
+                homing: asteroid.isHoming,
+                x: asteroid.pos.x,
+                y: asteroid.pos.y,
+              },
+            })
+          );
+
           this.spawn(
             new Explosion({
               x: asteroid.pos.x,
@@ -185,11 +246,17 @@ export class World {
         continue;
       }
 
-      // 2. Корабель + Астероїд
       const shipAsteroid = matchKinds(a, b, 'ship', 'asteroid');
       if (shipAsteroid) {
         const [ship, asteroid] = shipAsteroid;
         this.despawn(asteroid.id);
+
+        this.dispatchEvent(
+          new CustomEvent('exploded', {
+            detail: { kind: 'asteroid', x: asteroid.pos.x, y: asteroid.pos.y },
+          })
+        );
+
         this.spawn(
           new Explosion({
             x: asteroid.pos.x,
@@ -207,13 +274,23 @@ export class World {
         continue;
       }
 
-      // 3. Корабель + Бонус (Pickup)
       const shipPickup = matchKinds(a, b, 'ship', 'pickup');
       if (shipPickup) {
         const [ship, pickup] = shipPickup;
         ship.applyPickup(pickup.effect);
-        this.score += 50;
+        this.addScore(50, pickup.pos.clone());
         this.despawn(pickup.id);
+
+        this.dispatchEvent(
+          new CustomEvent('pickup', {
+            detail: {
+              type: pickup.effect.type,
+              x: pickup.pos.x,
+              y: pickup.pos.y,
+            },
+          })
+        );
+
         this.spawn(
           new Explosion({
             x: pickup.pos.x,
@@ -227,17 +304,14 @@ export class World {
   }
 
   step(dt, input) {
-    // Зберігаємо попередній стан для інтерполяції рендеру
     for (const entity of this) {
       entity.savePreviousState();
     }
 
-    // Керування біпланом
     if (this.ship.alive) {
       this.ship.applyControls(input, dt);
       if (input.fire && this.ship.canFire()) {
-        const bullet = this.ship.fire();
-        if (bullet) this.spawn(bullet);
+        this.fireShipBullet();
       }
     } else {
       this.respawnTimer -= dt;
@@ -248,20 +322,17 @@ export class World {
       }
     }
 
-    // Оновлення всіх сутностей
     for (const entity of this) {
       if (entity.alive) {
         entity.update(dt, this);
       }
     }
 
-    // Колізії
     this.resolveCollisions();
 
-    // Підтримка кількості перешкод та спавн бонусів
     let asteroidCount = 0;
     for (const _ of this.ofKind('asteroid')) asteroidCount++;
-    if (asteroidCount < 6) {
+    if (asteroidCount < this.arenaConfig.asteroidCount) {
       this.spawnRandomAsteroid();
     }
 
@@ -273,7 +344,6 @@ export class World {
       this.pickupSpawnTimer = 8.0;
     }
 
-    // Прибираємо мертві сутності в кінці кроку
     this.sweep();
   }
 }

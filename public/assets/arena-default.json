@@ -1,0 +1,9 @@
+{
+  "name": "Standard Airspace",
+  "width": 960,
+  "height": 640,
+  "asteroidCount": 6,
+  "homingEvery": 3,
+  "bgColor": "#0f172a",
+  "gridColor": "rgba(148, 163, 184, 0.08)"
+}

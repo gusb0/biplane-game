@@ -1,0 +1,52 @@
+{
+  "rooms": [
+    {
+      "id": "sky-patrol",
+      "name": "Sky Patrol (Стандартна арена)",
+      "players": 2,
+      "maxPlayers": 6,
+      "ping": 24,
+      "arena": {
+        "name": "Sky Patrol",
+        "width": 960,
+        "height": 640,
+        "asteroidCount": 6,
+        "homingEvery": 3,
+        "bgColor": "#0f172a",
+        "gridColor": "rgba(56, 189, 248, 0.08)"
+      }
+    },
+    {
+      "id": "red-baron-canyon",
+      "name": "Red Baron Canyon (Щільний вогонь)",
+      "players": 4,
+      "maxPlayers": 6,
+      "ping": 38,
+      "arena": {
+        "name": "Red Baron Canyon",
+        "width": 900,
+        "height": 600,
+        "asteroidCount": 9,
+        "homingEvery": 2,
+        "bgColor": "#1c1917",
+        "gridColor": "rgba(251, 146, 60, 0.09)"
+      }
+    },
+    {
+      "id": "arctic-front",
+      "name": "Arctic Front (Велика арена)",
+      "players": 1,
+      "maxPlayers": 8,
+      "ping": 19,
+      "arena": {
+        "name": "Arctic Front",
+        "width": 1080,
+        "height": 680,
+        "asteroidCount": 7,
+        "homingEvery": 4,
+        "bgColor": "#0c192c",
+        "gridColor": "rgba(125, 211, 252, 0.09)"
+      }
+    }
+  ]
+}
