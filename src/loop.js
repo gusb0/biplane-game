@@ -1,55 +1,64 @@
-export function createLoop({ step = 1 / 60, simulate, render }) {
-  let running = false;
-  let requestId = null;
+export function createLoop({ step, render, fixedDt = 1 / 60 }) {
+  let rafId = null;
+  let lastTime = 0;
   let accumulator = 0;
-  let lastTime = performance.now();
 
-  let stepCount = 0;
+  let statsTimer = 0;
   let frameCount = 0;
-  let lastStatReset = performance.now();
+  let stepCount = 0;
+  let lastFrameMs = 0;
 
-  const stats = { stepsPerSec: 0, framesPerSec: 0, frameTimeMs: 0 };
+  const stats = {
+    fps: 60,
+    stepsPerSec: 60,
+    frameMs: 16.7,
+  };
 
-  function frame(now) {
-    if (!running) return;
-
+  function tick(now) {
+    if (lastTime === 0) lastTime = now;
     const rawDt = (now - lastTime) / 1000;
     lastTime = now;
-    stats.frameTimeMs = rawDt * 1000;
 
-    accumulator += Math.min(rawDt, 0.25);
+    // Захист від «спіралі смерті» при перемиканні вкладок
+    const frameDt = Math.min(rawDt, 0.25);
+    lastFrameMs = rawDt * 1000;
+    accumulator += frameDt;
 
-    while (accumulator >= step) {
-      simulate(step);
-      accumulator -= step;
+    while (accumulator >= fixedDt) {
+      step(fixedDt);
+      accumulator -= fixedDt;
       stepCount++;
     }
 
-    render(accumulator / step, stats);
-    frameCount++;
+    const alpha = accumulator / fixedDt;
+    render(alpha, stats);
 
-    if (now - lastStatReset >= 1000) {
-      stats.stepsPerSec = stepCount;
-      stats.framesPerSec = frameCount;
-      stepCount = 0;
+    frameCount++;
+    statsTimer += rawDt;
+    if (statsTimer >= 0.5) {
+      stats.fps = Math.round(frameCount / statsTimer);
+      stats.stepsPerSec = Math.round(stepCount / statsTimer);
+      stats.frameMs = Number(lastFrameMs.toFixed(1));
       frameCount = 0;
-      lastStatReset = now;
+      stepCount = 0;
+      statsTimer = 0;
     }
 
-    requestId = requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(tick);
   }
 
   return {
     start() {
-      if (running) return;
-      running = true;
-      lastTime = performance.now();
-      lastStatReset = performance.now();
-      requestId = requestAnimationFrame(frame);
+      if (rafId === null) {
+        lastTime = 0;
+        rafId = requestAnimationFrame(tick);
+      }
     },
     stop() {
-      running = false;
-      if (requestId) cancelAnimationFrame(requestId);
-    }
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    },
   };
 }
