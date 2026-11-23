@@ -1,0 +1,16 @@
+{
+  "name": "@biplane/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./prng": "./src/prng.js",
+    "./sim": "./src/sim.js",
+    "./protocol": "./src/protocol.js",
+    "./codec": "./src/codec.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

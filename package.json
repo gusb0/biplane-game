@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "workspaces": [
+    "shared",
     "client",
     "server"
   ],
@@ -11,7 +12,7 @@
     "dev:client": "npm run dev --workspace=client",
     "build": "npm run build --workspace=client",
     "start": "npm run start --workspace=server",
-    "bench:rss": "npm run bench:rss --workspace=server",
-    "test": "npm run test --workspace=server"
+    "bench:codec": "node shared/test/bench-codec.js",
+    "test": "npm run test --workspace=shared && npm run test --workspace=server"
   }
 }

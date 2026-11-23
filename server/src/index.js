@@ -4,12 +4,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import { RoomManager } from './rooms.js';
+import { NetworkSimulator } from './netSim.js';
 import { attachMatchLogger } from './log/matchlog.js';
 import { streamReplayFile } from './log/replay.js';
 import { setupWebSocketServer } from './ws.js';
 
 const config = loadConfig();
 const clientDistDir = fileURLToPath(new URL('../../client/dist', import.meta.url));
+const netSim = new NetworkSimulator({ delayMs: 0, jitterMs: 0, dropRate: 0 });
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -23,6 +25,7 @@ const MIME_TYPES = {
 };
 
 const matchLoggers = new Map();
+let snapshotSender = null;
 
 const roomManager = new RoomManager({
   maxRooms: config.maxRooms,
@@ -30,6 +33,9 @@ const roomManager = new RoomManager({
   onRoomCreated: (room) => {
     const logger = attachMatchLogger(room, config.logDir);
     matchLoggers.set(room.id, logger);
+  },
+  onBroadcastSnapshot: (playerId, snapshotObj) => {
+    snapshotSender?.(playerId, snapshotObj);
   },
 });
 
@@ -101,6 +107,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/api/stats') {
+      sendJson(res, 200, {
+        uptimeSec: Math.round(process.uptime()),
+        rssMb: Math.round((process.memoryUsage().rss / (1024 * 1024)) * 10) / 10,
+        netSim: netSim.toJSON(),
+        matches: roomManager.getMatchStats(),
+      });
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/rooms') {
       sendJson(res, 200, { rooms: roomManager.listRooms() });
       return;
@@ -136,13 +152,6 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       await streamReplayFile(filePath, res);
-      return;
-    }
-
-    if (req.method === 'GET' && pathname === '/api/slow') {
-      const end = performance.now() + 300;
-      while (performance.now() < end) {}
-      sendJson(res, 200, { blockedMs: 300 });
       return;
     }
 
@@ -193,10 +202,15 @@ server.on('error', (err) => {
   console.error('[http] Server error:', err);
 });
 
-const { closeAllSockets } = setupWebSocketServer(server, { roomManager, config });
+const { closeAllSockets, sendSnapshotToPlayer } = setupWebSocketServer(server, {
+  roomManager,
+  config,
+  netSim,
+});
+snapshotSender = sendSnapshotToPlayer;
 
 server.listen(config.port, config.host, () => {
-  console.log(`[server] Listening on http://${config.host}:${config.port} (logs: ${config.logDir})`);
+  console.log(`[server] Listening on http://${config.host}:${config.port} (30 Hz authoritative matches)`);
 });
 
 let shuttingDown = false;

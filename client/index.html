@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Biplane Game — Lab 04</title>
+    <title>Biplane Game — Lab 05 (Authoritative 30 Hz + Binary)</title>
     <style>
       * {
         box-sizing: border-box;
@@ -37,7 +37,7 @@
         align-items: center;
         justify-content: center;
         padding: 20px;
-        z-index: 10;
+        z-index: 20;
       }
       #lobby-overlay.visible {
         display: flex;
@@ -144,32 +144,68 @@
       .lobby-error.visible {
         display: block;
       }
+      #net-controls {
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15, 23, 42, 0.92);
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 6px 12px;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        z-index: 10;
+        flex-wrap: wrap;
+      }
+      #net-controls.visible {
+        display: flex;
+      }
+      #net-controls label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #cbd5e1;
+        cursor: pointer;
+      }
+      #net-controls select,
+      #net-controls input[type='range'] {
+        accent-color: #38bdf8;
+        background: #020617;
+        color: #f8fafc;
+        border: 1px solid #475569;
+        border-radius: 4px;
+        padding: 2px 4px;
+        font-size: 11px;
+      }
       #chat-panel {
         position: fixed;
-        right: 20px;
-        bottom: 20px;
-        width: 310px;
+        right: 16px;
+        bottom: 16px;
+        width: 290px;
         background: rgba(15, 23, 42, 0.86);
         border: 1px solid #334155;
         border-radius: 10px;
-        padding: 10px;
+        padding: 8px;
         display: none;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
         z-index: 5;
       }
       #chat-panel.visible {
         display: flex;
       }
       #chat-messages {
-        max-height: 130px;
+        max-height: 110px;
         overflow-y: auto;
         font-size: 12px;
-        line-height: 1.45;
+        line-height: 1.4;
         color: #e2e8f0;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 3px;
       }
       .chat-sys {
         color: #38bdf8;
@@ -185,19 +221,51 @@
         border: 1px solid #475569;
         border-radius: 6px;
         color: #f8fafc;
-        padding: 6px 8px;
+        padding: 5px 8px;
         font-size: 12px;
       }
     </style>
   </head>
   <body>
+    <div id="net-controls">
+      <label title="Затримка сервера + розкид + втрата пакетів">
+        NetSim:
+        <select id="ctrl-netsim">
+          <option value="0,0,0">0 ms (LAN)</option>
+          <option value="100,0,0">100 ms</option>
+          <option value="100,30,0.02">100 ± 30 ms, 2% drop</option>
+          <option value="150,40,0.05">150 ± 40 ms, 5% drop</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="ctrl-predict" checked /> Prediction</label>
+      <label>
+        Interp:
+        <select id="ctrl-interp">
+          <option value="0">0 ms</option>
+          <option value="66">66 ms</option>
+          <option value="100" selected>100 ms</option>
+          <option value="150">150 ms</option>
+        </select>
+      </label>
+      <label>
+        Codec:
+        <select id="ctrl-codec">
+          <option value="binary" selected>Binary (DataView)</option>
+          <option value="json">JSON</option>
+        </select>
+      </label>
+      <label title="Навмисне ламання детермінізму через Math.random()">
+        <input type="checkbox" id="ctrl-rand-bug" /> Math.random() bug
+      </label>
+    </div>
+
     <canvas id="game"></canvas>
     <div id="lobby-overlay"></div>
     <div id="chat-panel">
       <div id="chat-messages"></div>
       <form class="chat-form" id="chat-form">
         <input id="chat-input" type="text" maxlength="200" placeholder="Повідомлення у чат (Enter)..." />
-        <button class="btn" type="submit" style="padding: 6px 10px; font-size: 12px;">OK</button>
+        <button class="btn" type="submit" style="padding: 5px 10px; font-size: 12px;">OK</button>
       </form>
     </div>
     <script type="module" src="/src/main.js"></script>

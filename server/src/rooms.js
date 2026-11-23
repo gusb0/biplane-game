@@ -1,8 +1,9 @@
 import { EventEmitter } from 'node:events';
 import crypto from 'node:crypto';
+import { AuthoritativeMatch } from './match.js';
 
 export class Room extends EventEmitter {
-  constructor({ id, name, maxPlayers = 6, arena = {}, persistent = false }) {
+  constructor({ id, name, maxPlayers = 6, arena = {}, persistent = false, onBroadcastSnapshot }) {
     super();
     this.id = id;
     this.name = name;
@@ -15,10 +16,14 @@ export class Room extends EventEmitter {
       width: Number(arena.width) || 960,
       height: Number(arena.height) || 640,
       asteroidCount: Number(arena.asteroidCount) || 6,
-      homingEvery: Number(arena.homingEvery) || 3,
       bgColor: arena.bgColor || '#0f172a',
       gridColor: arena.gridColor || 'rgba(56, 189, 248, 0.08)',
     };
+
+    this.match = new AuthoritativeMatch({
+      room: this,
+      onBroadcastSnapshot,
+    });
   }
 
   get roster() {
@@ -37,11 +42,18 @@ export class Room extends EventEmitter {
     const player = {
       id: crypto.randomUUID().slice(0, 8),
       name: playerName,
+      slot: 0,
       joinedAt: Date.now(),
     };
 
+    player.slot = this.match.addPlayer(player);
     this.players.set(player.id, player);
-    this.#recordEvent('join', { playerId: player.id, name: player.name, count: this.players.size });
+    this.#recordEvent('join', {
+      playerId: player.id,
+      slot: player.slot,
+      name: player.name,
+      count: this.players.size,
+    });
     this.emit('join', player);
     return player;
   }
@@ -51,6 +63,7 @@ export class Room extends EventEmitter {
     if (!player) return null;
 
     this.players.delete(playerId);
+    this.match.removePlayerById(playerId);
     this.#recordEvent('leave', { playerId: player.id, name: player.name, count: this.players.size });
     this.emit('leave', player);
 
@@ -84,23 +97,24 @@ export class Room extends EventEmitter {
       name: this.name,
       players: this.players.size,
       maxPlayers: this.maxPlayers,
-      ping: 15,
+      seed: this.match.seed,
       arena: this.arena,
     };
   }
 }
 
 export class RoomManager extends EventEmitter {
-  constructor({ maxRooms = 20, defaultMaxPlayers = 6, onRoomCreated } = {}) {
+  constructor({ maxRooms = 20, defaultMaxPlayers = 6, onRoomCreated, onBroadcastSnapshot } = {}) {
     super();
     this.maxRooms = maxRooms;
     this.defaultMaxPlayers = defaultMaxPlayers;
     this.onRoomCreated = onRoomCreated;
+    this.onBroadcastSnapshot = onBroadcastSnapshot;
     this.rooms = new Map();
 
     this.createRoom({
       id: 'sky-patrol',
-      name: 'Sky Patrol (Стандартна арена)',
+      name: 'Sky Patrol (Стандартна арена 30 Hz)',
       maxPlayers: defaultMaxPlayers,
       persistent: true,
       arena: {
@@ -108,7 +122,6 @@ export class RoomManager extends EventEmitter {
         width: 960,
         height: 640,
         asteroidCount: 6,
-        homingEvery: 3,
         bgColor: '#0f172a',
         gridColor: 'rgba(56, 189, 248, 0.08)',
       },
@@ -116,15 +129,14 @@ export class RoomManager extends EventEmitter {
 
     this.createRoom({
       id: 'red-baron-canyon',
-      name: 'Red Baron Canyon (Щільний вогонь)',
+      name: 'Red Baron Canyon (Щільний пояс астероїдів)',
       maxPlayers: defaultMaxPlayers,
       persistent: true,
       arena: {
         name: 'Red Baron Canyon',
-        width: 900,
-        height: 600,
+        width: 960,
+        height: 640,
         asteroidCount: 9,
-        homingEvery: 2,
         bgColor: '#1c1917',
         gridColor: 'rgba(251, 146, 60, 0.09)',
       },
@@ -143,6 +155,15 @@ export class RoomManager extends EventEmitter {
     return Array.from(this.rooms.values()).map((r) => r.toJSON());
   }
 
+  getMatchStats() {
+    return Array.from(this.rooms.values()).map((r) => ({
+      roomId: r.id,
+      players: r.players.size,
+      running: r.match.running,
+      ...r.match.stats,
+    }));
+  }
+
   createRoom({ id, name, maxPlayers, arena, persistent = false }) {
     if (this.rooms.size >= this.maxRooms) {
       const err = new Error(`Server room limit reached (${this.maxRooms})`);
@@ -151,8 +172,8 @@ export class RoomManager extends EventEmitter {
     }
 
     const cleanName = String(name || '').trim();
-    if (cleanName.length < 2 || cleanName.length > 40) {
-      const err = new Error('Room name must be 2..40 characters');
+    if (cleanName.length < 2 || cleanName.length > 60) {
+      const err = new Error('Room name must be 2..60 characters');
       err.status = 400;
       throw err;
     }
@@ -177,6 +198,7 @@ export class RoomManager extends EventEmitter {
       maxPlayers: Math.min(this.defaultMaxPlayers, Math.max(2, Number(maxPlayers) || this.defaultMaxPlayers)),
       arena,
       persistent,
+      onBroadcastSnapshot: this.onBroadcastSnapshot,
     });
 
     room.on('empty', () => {
@@ -193,6 +215,7 @@ export class RoomManager extends EventEmitter {
   deleteRoom(id) {
     const room = this.rooms.get(id);
     if (!room) return false;
+    room.match.stop();
     room.emit('closed');
     this.rooms.delete(id);
     return true;
