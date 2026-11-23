@@ -12,11 +12,8 @@ function createLinkedSignal(externalSignal, timeoutMs) {
   };
 
   if (externalSignal) {
-    if (externalSignal.aborted) {
-      onExternalAbort();
-    } else {
-      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
-    }
+    if (externalSignal.aborted) onExternalAbort();
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true });
   }
 
   return {
@@ -44,25 +41,17 @@ export class Lobby extends EventTarget {
     return this.#rooms;
   }
 
-  get isVisible() {
-    return this.#visible;
-  }
-
   startPolling() {
     this.#visible = true;
     this.stopPolling(false);
     this.refresh();
     this.#pollTimer = setInterval(() => {
-      if (this.#visible) {
-        this.refresh();
-      }
+      if (this.#visible) this.refresh();
     }, this.pollIntervalMs);
   }
 
   stopPolling(hide = true) {
-    if (hide) {
-      this.#visible = false;
-    }
+    if (hide) this.#visible = false;
     if (this.#pollTimer !== null) {
       clearInterval(this.#pollTimer);
       this.#pollTimer = null;
@@ -74,9 +63,7 @@ export class Lobby extends EventTarget {
   }
 
   async refresh() {
-    if (this.#inFlightController) {
-      this.#inFlightController.abort();
-    }
+    if (this.#inFlightController) this.#inFlightController.abort();
 
     const requestController = new AbortController();
     this.#inFlightController = requestController;
@@ -96,15 +83,10 @@ export class Lobby extends EventTarget {
       this.#rooms = Array.isArray(data.rooms) ? data.rooms : [];
       this.dispatchEvent(new CustomEvent('roomsChanged', { detail: this.#rooms }));
     } catch (err) {
-      if (err?.name === 'AbortError' && !this.#visible) {
-        return;
-      }
+      if (err?.name === 'AbortError' && !this.#visible) return;
       this.dispatchEvent(
         new CustomEvent('error', {
-          detail: {
-            message: err?.message || 'Не вдалося завантажити список кімнат',
-            name: err?.name || 'Error',
-          },
+          detail: { message: err?.message || 'Помилка завантаження кімнат', name: err?.name || 'Error' },
         })
       );
     } finally {
@@ -115,19 +97,29 @@ export class Lobby extends EventTarget {
     }
   }
 
+  async createRoom(name) {
+    const res = await fetch('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    await this.refresh();
+    return data.room;
+  }
+
   join(roomId, playerName = 'Pilot') {
     const chosenRoom = this.#rooms.find((r) => r.id === roomId) || this.#rooms[0];
     if (!chosenRoom) return;
 
     this.stopPolling(true);
-
     const cleanName = playerName.trim() || 'Pilot';
     this.dispatchEvent(
       new CustomEvent('joined', {
-        detail: {
-          room: chosenRoom,
-          playerName: cleanName,
-        },
+        detail: { room: chosenRoom, playerName: cleanName },
       })
     );
   }

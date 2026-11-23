@@ -2,6 +2,16 @@ import { ARENA_WIDTH, ARENA_HEIGHT } from '../sim/arena.js';
 
 export class HudController {
   #popups = [];
+  #roster = [];
+  #wsState = 'connected';
+
+  setRoster(players) {
+    this.#roster = Array.isArray(players) ? players : [];
+  }
+
+  setWsState(state) {
+    this.#wsState = state;
+  }
 
   attachToWorld(world, { signal } = {}) {
     this.#popups = [];
@@ -10,12 +20,7 @@ export class HudController {
       (e) => {
         const { delta, pos } = e.detail;
         if (pos) {
-          this.#popups.push({
-            x: pos.x,
-            y: pos.y,
-            text: `+${delta}`,
-            life: 1.0,
-          });
+          this.#popups.push({ x: pos.x, y: pos.y, text: `+${delta}`, life: 1.0 });
         }
       },
       { signal }
@@ -24,7 +29,6 @@ export class HudController {
 
   render(ctx, world, stats) {
     const { ship } = world;
-
     ctx.save();
 
     for (let i = this.#popups.length - 1; i >= 0; i--) {
@@ -46,7 +50,7 @@ export class HudController {
     ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 13px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(`PILOT: ${world.playerName} | ROOM: ${world.arenaConfig.name}`, 18, 22);
+    ctx.fillText(`PILOT: ${world.playerName} | ROOM: ${world.arenaConfig.name} [WS: ${this.#wsState}]`, 18, 22);
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 18px system-ui, sans-serif';
@@ -65,18 +69,9 @@ export class HudController {
     ctx.fillStyle = '#cbd5e1';
     ctx.fillText(`HP: ${ship.hp}/${ship.maxHp}`, 186, 62);
 
-    const buffs = [];
-    if (ship.hasShield) buffs.push(`Shield (${ship.shieldTimer.toFixed(1)}s)`);
-    if (ship.hasRapidFire) buffs.push(`RapidFire (${ship.rapidFireTimer.toFixed(1)}s)`);
-    if (ship.hasHoming) {
-      buffs.push(
-        ship.manualHoming ? 'Homing [H: ON]' : `Homing (${ship.homingTimer.toFixed(1)}s)`
-      );
-    }
-    if (buffs.length > 0) {
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText(`Active: ${buffs.join(' | ')}`, 18, 82);
-    }
+    const names = this.#roster.map((p) => p.name).join(', ') || world.playerName;
+    ctx.fillStyle = '#a7f3d0';
+    ctx.fillText(`Пілоти в кімнаті (${this.#roster.length || 1}): ${names}`, 18, 82);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#94a3b8';
@@ -102,7 +97,7 @@ export class HudController {
     ctx.fillStyle = '#64748b';
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillText(
-      'W/S — газ/гальмо | A/D — поворот | Space/Клік — вогонь | H — ракети | L — повернутися в лобі',
+      'W/S — газ/гальмо | A/D — поворот | Space/Клік — вогонь | H — ракети | L — вийти в лобі',
       ARENA_WIDTH / 2,
       ARENA_HEIGHT - 14
     );
