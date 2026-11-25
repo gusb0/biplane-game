@@ -12,7 +12,12 @@
     "dev:client": "npm run dev --workspace=client",
     "build": "npm run build --workspace=client",
     "start": "npm run start --workspace=server",
-    "bench:codec": "node shared/test/bench-codec.js",
+    "bench:codec": "npx tsx shared/test/bench-codec.ts",
+    "typecheck": "npm run typecheck --workspace=shared && npm run typecheck --workspace=server && npm run typecheck --workspace=client",
     "test": "npm run test --workspace=shared && npm run test --workspace=server"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   }
 }
