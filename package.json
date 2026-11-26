@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "biplane-game-workspace",
   "private": true,
   "type": "module",
@@ -14,10 +14,12 @@
     "start": "npm run start --workspace=server",
     "bench:codec": "npx tsx shared/test/bench-codec.ts",
     "typecheck": "npm run typecheck --workspace=shared && npm run typecheck --workspace=server && npm run typecheck --workspace=client",
-    "test": "npm run test --workspace=shared && npm run test --workspace=server"
+    "test": "npm test --workspace=shared && npm test --workspace=server && npm test --workspace=client",
+    "test:coverage": "npm run test:coverage --workspace=shared"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
   }
 }

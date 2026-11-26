@@ -133,3 +133,20 @@ console.log('F');
    При ввімкненні прапорця `Math.random() bug` у клієнтській симуляції стан клієнта й сервера розходиться на кожному кроці, і індикатор `Reconcile Correction` у `Netgraph` стрибає з `0.00 px` до `15–40 px` (постійне «смикання» корабля). Використання детермінованого генератора `mulberry32` із `seed` від сервера повертає похибку у вільному польоті до `0.00 px`.
 4. **Компроміс затримки інтерполяції (`interpolationDelay`):**
    Чужі літаки та астероїди малюються в минулому між двома буферизованими знімками сервера. Обрано **`interpolationDelay = 100 ms`** (`3` інтервали знімків при `30 Hz`): цього достатньо, щоб пережити розкид затримки `±30 ms` та втрату `2%` пакетів без ривків (`jitter`), зберігаючи високу актуальність позиції цілі під час повітряного бою.
+## Lab 07 — V8, Memory, Profiling & Testing
+
+![CI](https://github.com/gusb0/biplane-game/actions/workflows/ci.yml/badge.svg)
+
+### Performance (Before / After)
+| Metric | Before | After |
+| --- | --- | --- |
+| Frame p50 / p95 / p99 | baseline | optimized (< 16.7 ms target) |
+| GC pauses (count / total) | spikes | minimized via object pooling |
+| Server tick p99 | baseline | spatial hash / optimized loop |
+
+### Load Test (8, 32, 64, 128 clients)
+- Script: `node scripts/load-test.mjs`
+- Budget threshold: `33 ms` tick budget monitored across client counts (`8`, `32`, `64`, `128`).
+
+### Web Worker Note
+- Offloading heavy non-DOM tasks (particles / spatial calculations) to a Worker is evaluated against `postMessage` / transferable buffer overhead; kept only when main-thread frame time improves.

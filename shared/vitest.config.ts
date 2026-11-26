@@ -1,0 +1,17 @@
+﻿import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    include: ["test/**/*.test.ts", "src/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      thresholds: {
+        lines: 85,
+        functions: 85,
+        branches: 75,
+        statements: 85,
+      },
+    },
+  },
+});
