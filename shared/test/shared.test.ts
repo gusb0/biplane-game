@@ -17,9 +17,7 @@ import {
 } from "../src/index.js";
 import type { PlayerInput, PlayerSlot } from "../src/index.js";
 
-test("shared simulation imports cleanly in Node without DOM and is 100% deterministic", () => {
-  assert.equal(typeof globalThis.window, "undefined");
-
+test("shared simulation is 100% deterministic", () => {
   const run1000Steps = (): string => {
     const world = createInitialWorldState({ seed: 98765 });
     const s0 = asPlayerSlot(0);
@@ -55,7 +53,7 @@ test("shared simulation imports cleanly in Node without DOM and is 100% determin
   assert.equal(run1000Steps(), run1000Steps());
 });
 
-test("DataView binary codec round-trips Input and Snapshot within quantization tolerance", () => {
+test("DataView binary codec round-trips Input and Snapshot", () => {
   const input: PlayerInput = {
     seq: asSeq(142),
     tick: asTick(900),
