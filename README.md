@@ -150,3 +150,10 @@ console.log('F');
 
 ### Web Worker Note
 - Offloading heavy non-DOM tasks (particles / spatial calculations) to a Worker is evaluated against `postMessage` / transferable buffer overhead; kept only when main-thread frame time improves.
+
+## Lab 08 — Production, Docker, Observability & Live Deployment
+
+- **Process & Lifecycle**: Configured for `PORT` / `0.0.0.0`, graceful `SIGTERM` handling (stop accepting connections, notify clients, close sockets with code `1001`, flush logs, exit `0` within 10s), `/health` (liveness + build SHA) and `/ready` (readiness), fail-fast on uncaught exceptions.
+- **Observability & Config**: Structured JSON logging (`pino` style fields: `roomId`, `playerId`, `LOG_LEVEL`), `/metrics` tracking players, rooms, messages/s, bytes/s, tick duration, event-loop utilization, memory, and rejected connection reasons; `zod`-validated env config (`ALLOWED_ORIGINS`, `MAX_CONNECTIONS_PER_IP`, `MAX_ROOMS`, `MAX_PLAYERS_PER_ROOM`).
+- **Security & Chaos Notes**: Handshake `Origin` check, per-IP connection limit, and resilience notes for client disconnect, server restart (reconnect back to lobby), and malformed frame flood isolation.
+- **Docker & Release**: Multi-stage `Dockerfile` (`< 200 MB` target, non-root user, exec-form `CMD ["node", ...]`, `HEALTHCHECK`), `wss://` over TLS proxy, PWA manifest for mobile install, and tags `lab-08` and `v1.0.0`.
